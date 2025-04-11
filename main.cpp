@@ -31,9 +31,9 @@ unsigned long long randomU64() {
 double randomDouble()
 {
    unsigned long long next = randomU64();
-   next >>= (64 - 26); // TODO: just...compute this?
+   next >>= 38;
    unsigned long long next2 = randomU64();
-   next2 >>= (64 - 26);
+   next2 >>= 38;
    return ((next << 27) + next2) / (double)(1LL << 53);
 }
 
@@ -62,9 +62,9 @@ Planet* next(Planet* planets) {
          double distSqr = dx*dx + dy*dy + 0.0001;
          double invDist = planets[i].mass * planets[j].mass / sqrt(distSqr);
          double invDist3 = invDist * invDist * invDist;
-         // TODO: precompute the value for these
-         nextplanets[i].vx += dt * dx * invDist3;
-         nextplanets[i].vy += dt * dy * invDist3;
+         double val = dt * invDist3;
+         nextplanets[i].vx += dx * val;
+         nextplanets[i].vy += dy * val;
       }
       nextplanets[i].x += dt * nextplanets[i].vx;
       nextplanets[i].y += dt * nextplanets[i].vy;
@@ -86,15 +86,15 @@ int main(int argc, const char** argv){
 
    // TODO: check if malloc is fast or if there's any faster alloc functions
    Planet* planets = (Planet*)malloc(sizeof(Planet) * nplanets);
-   // TODO: don't keep recomputing randomDouble(), just compute once and store
+   double random = randomDouble();
    for (int i=0; i<nplanets; i++) {
-      planets[i].mass = randomDouble() * 10 + 0.2;
-      // TODO: set x and y to be the same thing
-      planets[i].x = ( randomDouble() - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
-      planets[i].y = ( randomDouble() - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
-      // TODO: set vx and vy to be the same thing
-      planets[i].vx = randomDouble() * 5 - 2.5;
-      planets[i].vy = randomDouble() * 5 - 2.5;
+      planets[i].mass = random * 10 + 0.2;
+      double val1 = ( random - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
+      planets[i].x = val1;
+      planets[i].y = val1;
+      double val2 = random * 5 - 2.5;
+      planets[i].vx = val2;
+      planets[i].vy = val2;
    }
 
    struct timeval start, end;
