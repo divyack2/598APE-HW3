@@ -110,28 +110,12 @@ int main(int argc, const char** argv){
    G = 6.6743;
 
    Planet* planets = (Planet*)malloc(sizeof(Planet) * nplanets);
-   double random = randomDouble();
-   if (nplanets > 50) {
-      #pragma omp parallel for
-      for (int i=0; i<nplanets; i++) {
-         planets[i].mass = random * 10 + 0.2;
-         double val1 = ( random - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
-         planets[i].x = val1;
-         planets[i].y = val1;
-         double val2 = random * 5 - 2.5;
-         planets[i].vx = val2;
-         planets[i].vy = val2;
-      }
-   } else {
-      for (int i=0; i<nplanets; i++) {
-         planets[i].mass = random * 10 + 0.2;
-         double val1 = ( random - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
-         planets[i].x = val1;
-         planets[i].y = val1;
-         double val2 = random * 5 - 2.5;
-         planets[i].vx = val2;
-         planets[i].vy = val2;
-      }
+   for (int i=0; i<nplanets; i++) {
+      planets[i].mass = randomDouble() * 10 + 0.2;
+      planets[i].x = ( randomDouble() - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
+      planets[i].y = ( randomDouble() - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
+      planets[i].vx = randomDouble() * 5 - 2.5;
+      planets[i].vy = randomDouble() * 5 - 2.5;
    }
 
    struct timeval start, end;
