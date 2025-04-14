@@ -3,8 +3,7 @@
 #include<math.h>
 
 #include <sys/time.h>
-
-// TODO: add -O3 flag to Makefile
+#include <omp.h>
 
 float tdiff(struct timeval *start, struct timeval *end) {
   return (end->tv_sec-start->tv_sec) + 1e-6*(end->tv_usec-start->tv_usec);
@@ -43,9 +42,8 @@ double dt;
 double G;
 
 Planet* next(Planet* planets) {
-   // TODO: check if malloc is fast or if there's any faster alloc functions
    Planet* nextplanets = (Planet*)malloc(sizeof(Planet) * nplanets);
-   // TODO: parallelize this loop
+   #pragma omp parallel for
    for (int i=0; i<nplanets; i++) {
       nextplanets[i].vx = planets[i].vx;
       nextplanets[i].vy = planets[i].vy;
@@ -54,8 +52,8 @@ Planet* next(Planet* planets) {
       nextplanets[i].y = planets[i].y;
    }
 
+   #pragma omp parallel for
    for (int i=0; i<nplanets; i++) {
-      // TODO: parallelize this loop?
       for (int j=0; j<nplanets; j++) {
          double dx = planets[j].x - planets[i].x;
          double dy = planets[j].y - planets[i].y;
@@ -87,6 +85,7 @@ int main(int argc, const char** argv){
    // TODO: check if malloc is fast or if there's any faster alloc functions
    Planet* planets = (Planet*)malloc(sizeof(Planet) * nplanets);
    double random = randomDouble();
+   #pragma omp parallel for
    for (int i=0; i<nplanets; i++) {
       planets[i].mass = random * 10 + 0.2;
       double val1 = ( random - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
