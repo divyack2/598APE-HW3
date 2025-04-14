@@ -43,7 +43,7 @@ double G;
 
 Planet* next(Planet* planets) {
    Planet* nextplanets = (Planet*)malloc(sizeof(Planet) * nplanets);
-   #pragma omp parallel for
+   #pragma omp parallel for simd
    for (int i=0; i<nplanets; i++) {
       nextplanets[i].vx = planets[i].vx;
       nextplanets[i].vy = planets[i].vy;
@@ -52,7 +52,7 @@ Planet* next(Planet* planets) {
       nextplanets[i].y = planets[i].y;
    }
 
-   #pragma omp parallel for
+   #pragma omp parallel for simd
    for (int i=0; i<nplanets; i++) {
       for (int j=0; j<nplanets; j++) {
          double dx = planets[j].x - planets[i].x;
@@ -67,7 +67,6 @@ Planet* next(Planet* planets) {
       nextplanets[i].x += dt * nextplanets[i].vx;
       nextplanets[i].y += dt * nextplanets[i].vy;
    }
-   // TODO: maybe instead of malloc + free every time, malloc + clear?
    free(planets);
    return nextplanets;
 }
@@ -85,7 +84,7 @@ int main(int argc, const char** argv){
    // TODO: check if malloc is fast or if there's any faster alloc functions
    Planet* planets = (Planet*)malloc(sizeof(Planet) * nplanets);
    double random = randomDouble();
-   #pragma omp parallel for
+   #pragma omp parallel for simd
    for (int i=0; i<nplanets; i++) {
       planets[i].mass = random * 10 + 0.2;
       double val1 = ( random - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
@@ -100,7 +99,6 @@ int main(int argc, const char** argv){
    gettimeofday(&start, NULL);
    for (int i=0; i<timesteps; i++) {
       planets = next(planets);
-      // printf("x=%f y=%f vx=%f vy=%f\n", planets[nplanets-1].x, planets[nplanets-1].y, planets[nplanets-1].vx, planets[nplanets-1].vy);
    }
    gettimeofday(&end, NULL);
    printf("Total time to run simulation %0.6f seconds, final location %f %f\n", tdiff(&start, &end), planets[nplanets-1].x, planets[nplanets-1].y);
