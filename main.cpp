@@ -17,6 +17,12 @@ struct Planet {
    double vy;
 };
 
+struct PlanetArray{
+   double *mass;
+   double *x, *y;
+   double *vx, *vy;
+};
+
 unsigned long long seed = 100;
 
 unsigned long long randomU64() {
@@ -26,7 +32,6 @@ unsigned long long randomU64() {
   return seed;
 }
 
-// TODO: possibly find a faster way of computing a random number
 double randomDouble()
 {
    unsigned long long next = randomU64();
@@ -41,61 +46,80 @@ int timesteps;
 double dt;
 double G;
 
-Planet* next(Planet* planets) {
-   Planet* nextplanets = (Planet*)malloc(sizeof(Planet) * nplanets);
-   #pragma omp parallel for simd
-   for (int i=0; i<nplanets; i++) {
-      nextplanets[i].vx = planets[i].vx;
-      nextplanets[i].vy = planets[i].vy;
-      nextplanets[i].mass = planets[i].mass;
-      nextplanets[i].x = planets[i].x;
-      nextplanets[i].y = planets[i].y;
-   }
+// Planet* next(Planet* planets) {
+//    Planet* nextplanets = (Planet*)malloc(sizeof(Planet) * nplanets);
+//    #pragma omp parallel for simd
+//    for (int i=0; i<nplanets; i++) {
+//       nextplanets[i].vx = planets[i].vx;
+//       nextplanets[i].vy = planets[i].vy;
+//       nextplanets[i].mass = planets[i].mass;
+//       nextplanets[i].x = planets[i].x;
+//       nextplanets[i].y = planets[i].y;
+//    }
 
-   #pragma omp parallel for simd
+//    #pragma omp parallel for simd
+//    for (int i=0; i<nplanets; i++) {
+//       for (int j=0; j<nplanets; j++) {
+//          double dx = planets[j].x - planets[i].x;
+//          double dy = planets[j].y - planets[i].y;
+//          double distSqr = dx*dx + dy*dy + 0.0001;
+//          double invDist = planets[i].mass * planets[j].mass / sqrt(distSqr);
+//          double invDist3 = invDist * invDist * invDist;
+//          double val = dt * invDist3;
+//          nextplanets[i].vx += dx * val;
+//          nextplanets[i].vy += dy * val;
+//       }
+//       nextplanets[i].x += dt * nextplanets[i].vx;
+//       nextplanets[i].y += dt * nextplanets[i].vy;
+//    }
+//    free(planets);
+//    return nextplanets;
+// }
+
+PlanetArray next(PlanetArray planets) {
+   // Set up nextplanets SoA
+   PlanetArray nextplanets;
+   nextplanets.mass = (double*)malloc(sizeof(double) * nplanets);
+   nextplanets.x = (double*)malloc(sizeof(double) * nplanets);
+   nextplanets.y = (double*)malloc(sizeof(double) * nplanets);
+   nextplanets.vx = (double*)malloc(sizeof(double) * nplanets);
+   nextplanets.vy = (double*)malloc(sizeof(double) * nplanets);
+
+   // #pragma omp parallel for simd
+   // for (int i=0; i<nplanets; i++) {
+   //    nextplanets.vx[i] = planets.vx[i];
+   //    nextplanets.vy[i] = planets.vy[i];
+   //    nextplanets.mass[i] = planets.mass[i];
+   //    nextplanets.x[i] = planets.x[i];
+   //    nextplanets.y[i] = planets.y[i];
+   // }
+
+   #pragma omp parallel for
    for (int i=0; i<nplanets; i++) {
+      nextplanets.vx[i] = planets.vx[i];
+      nextplanets.vy[i] = planets.vy[i];
+      nextplanets.mass[i] = planets.mass[i];
+      nextplanets.x[i] = planets.x[i];
+      nextplanets.y[i] = planets.y[i];
       for (int j=0; j<nplanets; j++) {
-         double dx = planets[j].x - planets[i].x;
-         double dy = planets[j].y - planets[i].y;
+         double dx = planets.x[j] - planets.x[i];
+         double dy = planets.y[j] - planets.y[i];
          double distSqr = dx*dx + dy*dy + 0.0001;
-         double invDist = planets[i].mass * planets[j].mass / sqrt(distSqr);
+         double invDist = planets.mass[i] * planets.mass[j] / sqrt(distSqr);
          double invDist3 = invDist * invDist * invDist;
          double val = dt * invDist3;
-         nextplanets[i].vx += dx * val;
-         nextplanets[i].vy += dy * val;
+         nextplanets.vx[i] += dx * val;
+         nextplanets.vy[i] += dy * val;
       }
-      nextplanets[i].x += dt * nextplanets[i].vx;
-      nextplanets[i].y += dt * nextplanets[i].vy;
+      nextplanets.x[i] += dt * nextplanets.vx[i];
+      nextplanets.y[i] += dt * nextplanets.vy[i];
    }
-   free(planets);
-   return nextplanets;
-}
-
-Planet* serial_next(Planet* planets) {
-   Planet* nextplanets = (Planet*)malloc(sizeof(Planet) * nplanets);
-   for (int i=0; i<nplanets; i++) {
-      nextplanets[i].vx = planets[i].vx;
-      nextplanets[i].vy = planets[i].vy;
-      nextplanets[i].mass = planets[i].mass;
-      nextplanets[i].x = planets[i].x;
-      nextplanets[i].y = planets[i].y;
-   }
-
-   for (int i=0; i<nplanets; i++) {
-      for (int j=0; j<nplanets; j++) {
-         double dx = planets[j].x - planets[i].x;
-         double dy = planets[j].y - planets[i].y;
-         double distSqr = dx*dx + dy*dy + 0.0001;
-         double invDist = planets[i].mass * planets[j].mass / sqrt(distSqr);
-         double invDist3 = invDist * invDist * invDist;
-         double val = dt * invDist3;
-         nextplanets[i].vx += dx * val;
-         nextplanets[i].vy += dy * val;
-      }
-      nextplanets[i].x += dt * nextplanets[i].vx;
-      nextplanets[i].y += dt * nextplanets[i].vy;
-   }
-   free(planets);
+      
+   free(planets.mass);
+   free(planets.x);
+   free(planets.y);
+   free(planets.vx);
+   free(planets.vy);
    return nextplanets;
 }
 
@@ -109,30 +133,29 @@ int main(int argc, const char** argv){
    dt = 0.001;
    G = 6.6743;
 
-   Planet* planets = (Planet*)malloc(sizeof(Planet) * nplanets);
+   // Set up SoA
+   PlanetArray planets;
+   planets.mass = (double*)malloc(sizeof(double) * nplanets);
+   planets.x = (double*)malloc(sizeof(double) * nplanets);
+   planets.y = (double*)malloc(sizeof(double) * nplanets);
+   planets.vx = (double*)malloc(sizeof(double) * nplanets);
+   planets.vy = (double*)malloc(sizeof(double) * nplanets);
+   
    for (int i=0; i<nplanets; i++) {
-      planets[i].mass = randomDouble() * 10 + 0.2;
-      planets[i].x = ( randomDouble() - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
-      planets[i].y = ( randomDouble() - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
-      planets[i].vx = randomDouble() * 5 - 2.5;
-      planets[i].vy = randomDouble() * 5 - 2.5;
+      planets.mass[i] = randomDouble() * 10 + 0.2;
+      planets.x[i] = ( randomDouble() - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
+      planets.y[i] = ( randomDouble() - 0.5 ) * 100 * pow(1 + nplanets, 0.4);
+      planets.vx[i] = randomDouble() * 5 - 2.5;
+      planets.vy[i] = randomDouble() * 5 - 2.5;
    }
 
    struct timeval start, end;
    gettimeofday(&start, NULL);
    for (int i=0; i<timesteps; i++) {
-      // if (i % 10000000 == 0) {
-      //    printf("At iteration %d \n", i);
-      // }
-      if (nplanets > 50) {
-         planets = next(planets);
-      } else {
-         planets = serial_next(planets);
-      }
-      
+      planets = next(planets);
    }
    gettimeofday(&end, NULL);
-   printf("Total time to run simulation %0.6f seconds, final location %f %f\n", tdiff(&start, &end), planets[nplanets-1].x, planets[nplanets-1].y);
+   printf("Total time to run simulation %0.6f seconds, final location %f %f\n", tdiff(&start, &end), planets.x[nplanets-1], planets.y[nplanets-1]);
 
    return 0;   
 }
