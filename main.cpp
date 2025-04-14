@@ -76,51 +76,67 @@ double G;
 //    return nextplanets;
 // }
 
-PlanetArray next(PlanetArray planets) {
-   // Set up nextplanets SoA
-   PlanetArray nextplanets;
-   nextplanets.mass = (double*)malloc(sizeof(double) * nplanets);
-   nextplanets.x = (double*)malloc(sizeof(double) * nplanets);
-   nextplanets.y = (double*)malloc(sizeof(double) * nplanets);
-   nextplanets.vx = (double*)malloc(sizeof(double) * nplanets);
-   nextplanets.vy = (double*)malloc(sizeof(double) * nplanets);
+// PlanetArray next(PlanetArray planets) {
+//    // Set up nextplanets SoA
+//    PlanetArray nextplanets;
+//    nextplanets.mass = (double*)malloc(sizeof(double) * nplanets);
+//    nextplanets.x = (double*)malloc(sizeof(double) * nplanets);
+//    nextplanets.y = (double*)malloc(sizeof(double) * nplanets);
+//    nextplanets.vx = (double*)malloc(sizeof(double) * nplanets);
+//    nextplanets.vy = (double*)malloc(sizeof(double) * nplanets);
 
-   // #pragma omp parallel for simd
-   // for (int i=0; i<nplanets; i++) {
-   //    nextplanets.vx[i] = planets.vx[i];
-   //    nextplanets.vy[i] = planets.vy[i];
-   //    nextplanets.mass[i] = planets.mass[i];
-   //    nextplanets.x[i] = planets.x[i];
-   //    nextplanets.y[i] = planets.y[i];
-   // }
+//    #pragma omp parallel for
+//    for (int i=0; i<nplanets; i++) {
+//       nextplanets.vx[i] = planets.vx[i];
+//       nextplanets.vy[i] = planets.vy[i];
+//       nextplanets.mass[i] = planets.mass[i];
+//       nextplanets.x[i] = planets.x[i];
+//       nextplanets.y[i] = planets.y[i];
 
-   #pragma omp parallel for
+//       for (int j=0; j<nplanets; j++) {
+//          double dx = planets.x[j] - planets.x[i];
+//          double dy = planets.y[j] - planets.y[i];
+//          double distSqr = dx*dx + dy*dy + 0.0001;
+//          double invDist = planets.mass[i] * planets.mass[j] / sqrt(distSqr);
+//          double invDist3 = invDist * invDist * invDist;
+//          double val = dt * invDist3;
+//          nextplanets.vx[i] += dx * val;
+//          nextplanets.vy[i] += dy * val;
+//       }
+//       nextplanets.x[i] += dt * nextplanets.vx[i];
+//       nextplanets.y[i] += dt * nextplanets.vy[i];
+//    }
+      
+//    free(planets.mass);
+//    free(planets.x);
+//    free(planets.y);
+//    free(planets.vx);
+//    free(planets.vy);
+//    return nextplanets;
+// }
+
+void next(const PlanetArray* planets, PlanetArray* nextplanets) {
+   #pragma omp parallel for simd
    for (int i=0; i<nplanets; i++) {
-      nextplanets.vx[i] = planets.vx[i];
-      nextplanets.vy[i] = planets.vy[i];
-      nextplanets.mass[i] = planets.mass[i];
-      nextplanets.x[i] = planets.x[i];
-      nextplanets.y[i] = planets.y[i];
+      nextplanets->vx[i] = planets->vx[i];
+      nextplanets->vy[i] = planets->vy[i];
+      nextplanets->mass[i] = planets->mass[i];
+      nextplanets->x[i] = planets->x[i];
+      nextplanets->y[i] = planets->y[i];
+
       for (int j=0; j<nplanets; j++) {
-         double dx = planets.x[j] - planets.x[i];
-         double dy = planets.y[j] - planets.y[i];
+         double dx = planets->x[j] - planets->x[i];
+         double dy = planets->y[j] - planets->y[i];
          double distSqr = dx*dx + dy*dy + 0.0001;
-         double invDist = planets.mass[i] * planets.mass[j] / sqrt(distSqr);
+         double invDist = planets->mass[i] * planets->mass[j] / sqrt(distSqr);
          double invDist3 = invDist * invDist * invDist;
          double val = dt * invDist3;
-         nextplanets.vx[i] += dx * val;
-         nextplanets.vy[i] += dy * val;
+         nextplanets->vx[i] += dx * val;
+         nextplanets->vy[i] += dy * val;
       }
-      nextplanets.x[i] += dt * nextplanets.vx[i];
-      nextplanets.y[i] += dt * nextplanets.vy[i];
+      nextplanets->x[i] += dt * nextplanets->vx[i];
+      nextplanets->y[i] += dt * nextplanets->vy[i];
    }
-      
-   free(planets.mass);
-   free(planets.x);
-   free(planets.y);
-   free(planets.vx);
-   free(planets.vy);
-   return nextplanets;
 }
 
 int main(int argc, const char** argv){
@@ -140,6 +156,13 @@ int main(int argc, const char** argv){
    planets.y = (double*)malloc(sizeof(double) * nplanets);
    planets.vx = (double*)malloc(sizeof(double) * nplanets);
    planets.vy = (double*)malloc(sizeof(double) * nplanets);
+
+   PlanetArray nextplanets;
+   nextplanets.mass = (double*)malloc(sizeof(double) * nplanets);
+   nextplanets.x = (double*)malloc(sizeof(double) * nplanets);
+   nextplanets.y = (double*)malloc(sizeof(double) * nplanets);
+   nextplanets.vx = (double*)malloc(sizeof(double) * nplanets);
+   nextplanets.vy = (double*)malloc(sizeof(double) * nplanets);
    
    for (int i=0; i<nplanets; i++) {
       planets.mass[i] = randomDouble() * 10 + 0.2;
@@ -152,10 +175,27 @@ int main(int argc, const char** argv){
    struct timeval start, end;
    gettimeofday(&start, NULL);
    for (int i=0; i<timesteps; i++) {
-      planets = next(planets);
+      // planets = next(planets);
+      next(&planets, &nextplanets);
+      PlanetArray temp = planets;
+      planets = nextplanets;
+      nextplanets = temp;
    }
    gettimeofday(&end, NULL);
    printf("Total time to run simulation %0.6f seconds, final location %f %f\n", tdiff(&start, &end), planets.x[nplanets-1], planets.y[nplanets-1]);
+
+   // Free up memory
+   free(planets.mass);
+   free(planets.x);
+   free(planets.y);
+   free(planets.vx);
+   free(planets.vy);
+
+   free(nextplanets.mass);
+   free(nextplanets.x);
+   free(nextplanets.y);
+   free(nextplanets.vx);
+   free(nextplanets.vy);
 
    return 0;   
 }
