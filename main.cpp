@@ -40,7 +40,8 @@ int timesteps;
 double dt;
 double G;
 
-void next(const PlanetArray* planets, PlanetArray* nextplanets) {
+void next(const PlanetArray* planets) {
+   // pull out constants
    __m256d dt_vec = _mm256_set1_pd(dt);
    __m256d e = _mm256_set1_pd(0.0001);
 
@@ -108,14 +109,9 @@ void next(const PlanetArray* planets, PlanetArray* nextplanets) {
       double nvy = vyi + fy;
       planets->vx[i] = nvx;
       planets->vy[i] = nvy;
-      // nextplanets->vx[i] = nvx;
-      // nextplanets->vy[i] = nvy;
-      // nextplanets->x[i] = xi + dt * nvx;
-      // nextplanets->y[i] = yi + dt * nvy;
-      // nextplanets->mass[i] = mi;
    }
 
-   // handle leftovers
+   // modify positions in-place after all velocities have been updated
    #pragma omp simd
    for (int i = 0; i < nplanets; i++) {
       planets->x[i] += dt * planets->vx[i];
@@ -134,7 +130,6 @@ int main(int argc, const char** argv){
    dt = 0.001;
    G = 6.6743;
 
-   // int r =0;
    // Set up SoA
    PlanetArray planets;
    planets.mass = (double*)malloc(sizeof(double) * nplanets);
@@ -142,23 +137,6 @@ int main(int argc, const char** argv){
    planets.y = (double*)malloc(sizeof(double) * nplanets);
    planets.vx = (double*)malloc(sizeof(double) * nplanets);
    planets.vy = (double*)malloc(sizeof(double) * nplanets);
-   // r |= posix_memalign((void**)&planets.mass, 64, sizeof(double) * nplanets);
-   // r |= posix_memalign((void**)&planets.x, 64, sizeof(double) * nplanets);
-   // r |= posix_memalign((void**)&planets.y, 64, sizeof(double) * nplanets);
-   // r |= posix_memalign((void**)&planets.vx, 64, sizeof(double) * nplanets);
-   // r |= posix_memalign((void**)&planets.vy, 64, sizeof(double) * nplanets);
-
-   PlanetArray nextplanets;
-   nextplanets.mass = (double*)malloc(sizeof(double) * nplanets);
-   nextplanets.x = (double*)malloc(sizeof(double) * nplanets);
-   nextplanets.y = (double*)malloc(sizeof(double) * nplanets);
-   nextplanets.vx = (double*)malloc(sizeof(double) * nplanets);
-   nextplanets.vy = (double*)malloc(sizeof(double) * nplanets);
-   // r |= posix_memalign((void**)&nextplanets.mass, 64, sizeof(double) * nplanets);
-   // r |= posix_memalign((void**)&nextplanets.x, 64, sizeof(double) * nplanets);
-   // r |= posix_memalign((void**)&nextplanets.y, 64, sizeof(double) * nplanets);
-   // r |= posix_memalign((void**)&nextplanets.vx, 64, sizeof(double) * nplanets);
-   // r |= posix_memalign((void**)&nextplanets.vy, 64, sizeof(double) * nplanets);
    
    for (int i=0; i<nplanets; i++) {
       planets.mass[i] = randomDouble() * 10 + 0.2;
@@ -171,11 +149,7 @@ int main(int argc, const char** argv){
    struct timeval start, end;
    gettimeofday(&start, NULL);
    for (int i=0; i<timesteps; i++) {
-      // planets = next(planets);
-      next(&planets, &nextplanets);
-      PlanetArray temp = planets;
-      planets = nextplanets;
-      nextplanets = temp;
+      next(&planets);
    }
    gettimeofday(&end, NULL);
    printf("Total time to run simulation %0.6f seconds, final location %f %f\n", tdiff(&start, &end), planets.x[nplanets-1], planets.y[nplanets-1]);
@@ -186,12 +160,6 @@ int main(int argc, const char** argv){
    free(planets.y);
    free(planets.vx);
    free(planets.vy);
-
-   free(nextplanets.mass);
-   free(nextplanets.x);
-   free(nextplanets.y);
-   free(nextplanets.vx);
-   free(nextplanets.vy);
 
    return 0;   
 }
