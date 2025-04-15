@@ -41,7 +41,10 @@ double dt;
 double G;
 
 void next(const PlanetArray* planets, PlanetArray* nextplanets) {
-   #pragma omp parallel for
+   __m256d dt_vec = _mm256_set1_pd(dt);
+   __m256d e = _mm256_set1_pd(0.0001);
+
+   #pragma omp parallel for schedule(static)
    for (int i = 0; i < nplanets; i++) {
       double xi = planets->x[i];
       double yi = planets->y[i];
@@ -53,7 +56,6 @@ void next(const PlanetArray* planets, PlanetArray* nextplanets) {
       __m256d xi_vec = _mm256_set1_pd(xi);
       __m256d yi_vec = _mm256_set1_pd(yi);
       __m256d mi_vec = _mm256_set1_pd(mi);
-      __m256d dt_vec = _mm256_set1_pd(dt);
       __m256d fx_vec = _mm256_setzero_pd();
       __m256d fy_vec = _mm256_setzero_pd();
 
@@ -71,12 +73,12 @@ void next(const PlanetArray* planets, PlanetArray* nextplanets) {
          __m256d dy = _mm256_sub_pd(yj, yi_vec);
          __m256d dx2 = _mm256_mul_pd(dx, dx);
          __m256d dy2 = _mm256_mul_pd(dy, dy);
-         __m256d distSqr = _mm256_add_pd(_mm256_add_pd(dx2, dy2), _mm256_set1_pd(0.0001));
-         __m256d dist = _mm256_sqrt_pd(distSqr);
+         __m256d distSqr = _mm256_add_pd(_mm256_add_pd(dx2, dy2), e);
+         __m256d dist = _mm256_rsqrt14_pd(distSqr);
 
          __m256d mprod = _mm256_mul_pd(mi_vec, mj);
          __m256d dist3 = _mm256_mul_pd(dist, _mm256_mul_pd(dist, dist));
-         __m256d inv = _mm256_div_pd(mprod, dist3);
+         __m256d inv = _mm256_mul_pd(mprod, dist3);
          __m256d val = _mm256_mul_pd(dt_vec, inv);
 
          // same as fx += dx * val
@@ -104,11 +106,20 @@ void next(const PlanetArray* planets, PlanetArray* nextplanets) {
 
       double nvx = vxi + fx;
       double nvy = vyi + fy;
-      nextplanets->vx[i] = nvx;
-      nextplanets->vy[i] = nvy;
-      nextplanets->x[i] = xi + dt * nvx;
-      nextplanets->y[i] = yi + dt * nvy;
-      nextplanets->mass[i] = mi;
+      planets->vx[i] = nvx;
+      planets->vy[i] = nvy;
+      // nextplanets->vx[i] = nvx;
+      // nextplanets->vy[i] = nvy;
+      // nextplanets->x[i] = xi + dt * nvx;
+      // nextplanets->y[i] = yi + dt * nvy;
+      // nextplanets->mass[i] = mi;
+   }
+
+   // handle leftovers
+   #pragma omp simd
+   for (int i = 0; i < nplanets; i++) {
+      planets->x[i] += dt * planets->vx[i];
+      planets->y[i] += dt * planets->vy[i];
    }
 }
 
@@ -123,6 +134,7 @@ int main(int argc, const char** argv){
    dt = 0.001;
    G = 6.6743;
 
+   // int r =0;
    // Set up SoA
    PlanetArray planets;
    planets.mass = (double*)malloc(sizeof(double) * nplanets);
@@ -130,6 +142,11 @@ int main(int argc, const char** argv){
    planets.y = (double*)malloc(sizeof(double) * nplanets);
    planets.vx = (double*)malloc(sizeof(double) * nplanets);
    planets.vy = (double*)malloc(sizeof(double) * nplanets);
+   // r |= posix_memalign((void**)&planets.mass, 64, sizeof(double) * nplanets);
+   // r |= posix_memalign((void**)&planets.x, 64, sizeof(double) * nplanets);
+   // r |= posix_memalign((void**)&planets.y, 64, sizeof(double) * nplanets);
+   // r |= posix_memalign((void**)&planets.vx, 64, sizeof(double) * nplanets);
+   // r |= posix_memalign((void**)&planets.vy, 64, sizeof(double) * nplanets);
 
    PlanetArray nextplanets;
    nextplanets.mass = (double*)malloc(sizeof(double) * nplanets);
@@ -137,6 +154,11 @@ int main(int argc, const char** argv){
    nextplanets.y = (double*)malloc(sizeof(double) * nplanets);
    nextplanets.vx = (double*)malloc(sizeof(double) * nplanets);
    nextplanets.vy = (double*)malloc(sizeof(double) * nplanets);
+   // r |= posix_memalign((void**)&nextplanets.mass, 64, sizeof(double) * nplanets);
+   // r |= posix_memalign((void**)&nextplanets.x, 64, sizeof(double) * nplanets);
+   // r |= posix_memalign((void**)&nextplanets.y, 64, sizeof(double) * nplanets);
+   // r |= posix_memalign((void**)&nextplanets.vx, 64, sizeof(double) * nplanets);
+   // r |= posix_memalign((void**)&nextplanets.vy, 64, sizeof(double) * nplanets);
    
    for (int i=0; i<nplanets; i++) {
       planets.mass[i] = randomDouble() * 10 + 0.2;
